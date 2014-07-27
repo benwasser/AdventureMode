@@ -1,0 +1,245 @@
+@font-face {
+	font-family: 'VGA8';
+	src: url('/static/VGA8.ttf');
+}
+* {
+	-webkit-box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+	-webkit-font-smoothing: antialiased;
+	font-weight:400;
+}
+
+body {
+	font-family: 'VGA8', Courier, monospace;
+	margin:0px;
+	padding:0px;
+	color:#fff;
+	font-size:8px;
+}
+
+p {
+	line-height: 1.9;
+	margin-top:5px;
+	margin-bottom:5px;
+}
+
+h1 {
+	font-size: 32px;
+	margin:10px;
+	display:inline-block;
+	padding: 6px;
+}
+
+h2 {
+	font-size: 16px;
+	line-height:1.5;
+	margin:10px;
+	text-align:center;
+}
+
+h3 {
+	font-size: 8px;
+	text-align:center;
+	margin-top:30px;
+	margin-bottom:10px;
+}
+
+
+#map, #interaction-map {
+	font-size: 16px;
+	line-height: 18px;
+	letter-spacing: 2px;
+
+	font-size: 13px;
+	line-height: 14px;
+	letter-spacing: 1px;
+
+	margin-right:10px;
+	margin-bottom:10px;
+	display:inline-block;
+}
+
+.button {
+	display:inline-block;
+	cursor: pointer;
+	padding:5px;
+	border: 2px solid #fff;
+	margin-top: 3px;
+	margin-bottom: 3px;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+	user-select: none;
+}
+
+.logged-out-background {
+	background: url(/static/screenshot.png) no-repeat center center fixed; 
+	-webkit-background-size: cover;
+	-moz-background-size: cover;
+	-o-background-size: cover;
+	background-size: cover;
+	height:100%;
+}
+
+.button a {
+	text-decoration: none;
+	border-bottom:0px;
+}
+
+input {
+	color:#000;
+	background-color: #fff;
+	border:0;
+	padding:6px;
+	font-family: inherit;
+	font-size: inherit;
+	margin:0;
+	width:100%;
+	max-width:100%;
+}
+
+a {
+	color:inherit;
+	border-bottom: 2px solid #fff;
+}
+
+#wrapper {
+	width:600px;
+	max-width:100%;
+	margin: auto auto;
+	margin-top:150px;
+	background: rgba(0,0,0,0.7);
+	padding:20px;
+}
+
+#chat {
+	width:100%;
+	height:120px;
+	text-align:left;
+	line-height:1.5;
+	padding:5px;
+	border: 2px solid #fff;
+	overflow:auto;
+	-ms-word-break: break-all;
+
+     /* Be VERY careful with this, breaks normal words wh_erever */
+     word-break: break-all;
+
+     /* Non standard for webkit */
+     word-break: break-word;
+	
+	-webkit-hyphens: auto;
+	   -moz-hyphens: auto;
+	        hyphens: auto;
+}
+
+#chat-input-container {
+	height:26px;
+}
+
+#chat-input {
+	padding:6px;
+	outline: none;
+	display:none;
+}
+
+#onscreen-controls {
+	display:none;
+}
+
+
+#character-chooser {
+	margin-top:30px;
+}
+
+.side-panel {
+	display:inline-block;
+	width:164px;
+}
+
+#player-info {
+	font-size:8px;
+	text-align:left;
+	line-height:1.8;
+	border: 2px solid #fff;
+	padding:5px;
+	vertical-align:top;
+}
+.read-out-label {
+	display:inline-block;
+	width:75px;
+}
+
+hr {
+	border:0;
+	background-color:#fff;
+	height:1px;
+	width:100%;
+}
+
+#news {
+	text-align:left;
+	margin-top:10px;
+}
+
+.tip {
+	color:#d04f68;
+	line-height:1.6;
+}
+
+
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+ 
+::-webkit-scrollbar-track {
+    border-radius: 0px;
+    background-color:#a8b0b1;
+}
+ 
+::-webkit-scrollbar-thumb {
+    border-radius: 0px;
+    background-color:#7f8586;
+}
+
+
+@media (max-width: 830px) {
+	h1 {
+		font-size: 16px;
+		margin-bottom:10px;
+	}
+	h2 {
+		font-size: 12px;
+	}
+	* {
+		max-width:100%;
+	}
+	
+	#map, #interaction-map {
+		font-size: 8px;
+		line-height: 8px;
+		letter-spacing: 0px;
+		padding: 5px;
+		margin:5px;
+	}
+	
+	#onscreen-controls {
+		display:inline-block;
+	}
+	
+	#chat {
+		height:90px;
+	}
+	
+	#wrapper {
+		margin-top:0px;
+		padding-top:10px;
+	}
+	
+	.logged-out-background {
+		background: #000;
+	}
+}

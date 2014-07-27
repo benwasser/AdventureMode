@@ -1,0 +1,486 @@
+
+<!doctype html>
+<html>
+	<head>
+		<script type='application/javascript' src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script>
+		<link rel="stylesheet" href="/static/style.css">
+		<meta name="viewport" id="vp" content="initial-scale=1.0,user-scalable=no,maximum-scale=1,width=device-width" />
+		<meta name="apple-mobile-web-app-capable" content="no">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+		<title>Adventure Mode</title>
+		<style>
+			body {
+				width:100%;
+				text-align:center;
+				background-color:#000;
+			}
+			h1 {
+				font-size:16px;
+			}
+			#map-container {
+				position:relative;
+				width: 536px;
+				height: 400px;
+				float: left;
+			}
+			#map {
+				position:absolute;
+				left:0;
+				top:0;
+			}
+			#interaction-map {
+				position:absolute;
+				left:0;
+				top:0;
+				opacity:0.5;
+			}
+
+			@media (max-width: 830px) {
+				h1 {
+					font-size: 8px;
+					margin:2px;
+				}
+				.tip {
+					display:none;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<!--<div id="wrapper" style="text-align:center;">-->
+			<h1>Adventure Mode</h1>
+			<br />
+			<div id="game-container" style="display:inline-block;width:700px;max-width:100%;">
+				<div id="chat"></div>
+				<div id="chat-input-container">
+					<input id="chat-input" autocomplete="off" placeholder="Type your message" />
+				</div>
+				<div id="map-container">
+					<div id="map"></div>
+					<div id="interaction-map"></div>
+				</div>
+				<div id="player-info" class="side-panel">
+					<div><span class="read-out-label">Position: </span><span id="position-read-out" style="color:#02d401;">247/432</span></div>
+					<p class="tip">Use the wasd keys to move</p>
+					<hr />
+					<div><span class="read-out-label">Health: </span><span id="health-read-out" style="color:#4185d8;">100</span>%</div>
+					<div><span class="read-out-label">Hunger: </span><span id="hunger-read-out" style="color:#4185d8;">0</span>%</div>
+					<div><span class="read-out-label">Thirst: </span><span id="thirst-read-out" style="color:#4185d8;">0</span>%</div>
+					<hr />
+					<div><span class="read-out-label">Strength: </span><span id="strength-read-out" style="color:#02d401;">1</span></div>
+					<div><span class="read-out-label">Agility: </span><span id="agility-read-out" style="color:#02d401;">1</span></div>
+					<hr />
+					<div><span class="read-out-label">Holding: </span><span id="holding-read-out" style="color:#02d401;">nothing</span></div>
+					<div><span class="read-out-label">Stood on: </span><span id="standing-read-out" style="color:#02d401;">nothing</span></div>
+					<p class="tip">Press e while standing on an object to pick it up</p>
+				</div>
+				<div id="onscreen-controls">
+					<span class="button" onclick="typing = true;$('#chat-input').show();$('#chat-input').focus();">Talk</span>
+				</div>
+			</div>
+		<!--</div>-->
+	</body>
+	<script src="/socket.io/socket.io.js"></script>
+	<script>
+		var socket = io();
+		var uuid = '<%- uuid %>';
+		var typing = false;
+		var current_move = null;
+		var typed_message = null;
+		
+		socket.emit('login', uuid);
+		
+		setInterval(function(){
+			if (typed_message) {
+				socket.emit('chat', typed_message);
+				typed_message = null;
+			} else if (current_move){
+				socket.emit('move', current_move);
+				current_move = null;
+			}
+		}, 100);
+		
+		socket.on('error_pop_up', function(msg){
+			// alert(msg);
+			chatMessage(msg, 'red');
+		});
+		
+		socket.on('server_msg', function(msg){
+			chatMessage(msg, '#fff');
+		});
+		
+		socket.on('login', function(user){
+			chatMessage('You are logged in as ' + user + '. Use WASD to move and T to talk to anyone in view.', '#fff');
+			setInterval(function(){
+				socket.emit('ping');
+			},3000);
+		});
+
+		socket.on('local_chat', function(msg){
+			chatMessage(msg, '#2c69bf');
+		});
+
+		socket.on('update', function(updates){
+			$('#map').html(renderMap(updates.map, 1));
+			$('#interaction-map').html(renderInteractionOverlay(updates.interaction, 1));
+			$('#position-read-out').html(updates.user.x + '/' + updates.user.y);
+			$('#health-read-out').html(updates.user.health);
+			$('#hunger-read-out').html(updates.user.hunger);
+			$('#thirst-read-out').html(updates.user.thirst);
+			$('#strength-read-out').html(updates.user.strength);
+			$('#agility-read-out').html(updates.user.agility);
+			$('#holding-read-out').html(updates.user.holding || 'nothing');
+			$('#standing-read-out').html(updates.user.standing_on || 'nothing');
+		});
+		
+		function chatMessage(msg, color){
+			var starting_scroll_height_difference = $('#chat')[0].scrollHeight - $('#chat').scrollTop();
+			$('#chat').append('<span style="color:' + (color || '#fff') + '">-' + msg + '</span><br />');
+			if (starting_scroll_height_difference < $('#chat').height() + 20){
+				$('#chat').scrollTop($('#chat')[0].scrollHeight);
+			}
+		}
+		
+		$('#chat-input').on('keypress', function(e) {
+			if (typing && e.keyCode == 13) {
+				typed_message = $('#chat-input').val();
+				typing = false;
+				$('#chat-input').val('');
+				$('#chat-input').hide();
+				return false;
+			}
+		});
+		
+		$(document).keypress(function(e) {
+			console.log(e.which);
+			if (!typing && e.which == 116) { //t
+				typing = true;
+				$('#chat-input').show();
+				$('#chat-input').focus();
+				return false;
+			}
+			if (!typing && [119, 115, 97, 100, 101, 87, 83, 65, 68].indexOf(e.which) != -1){
+				current_move = e.which;
+			}
+			// 119 w
+			// 115 s
+			// 97 a
+			// 100 d
+			// 101 e
+			// 87 W
+			// 83 S
+			// 65 A
+			// 68 D
+			// 
+		});
+		$(document).keyup(function(e) {
+			if (typing && e.keyCode == 27) { //esc
+				typing = false;
+				$('#chat-input').hide();
+				return false;
+			}
+		});
+
+		function renderMap(tiles, tile_set){
+			var output_map = '';
+			for (var i = 0; i < tiles.length; i++) {
+				for (var j = 0; j < tiles[i].length; j++) {
+					if (tiles[i][j] == null) {
+						output_map += '<span style="color:#c0c9cb">▒</span>';
+					} else {
+						output_map += !tile_set ? charConvert(tiles[i][j]) : tile_sets[tile_set][tiles[i][j]];
+					}
+				}
+				output_map += '<br />';
+			}
+			return output_map;
+		};
+		
+		function renderInteractionOverlay(tiles, tile_set){
+			var output_map = '';
+			for (var i = 0; i < tiles.length; i++) {
+				for (var j = 0; j < tiles[i].length; j++) {
+					if (tiles[i][j] == null) {
+						output_map += '&nbsp;';
+					} else {
+						if (tiles[i][j]) output_map += interaction_tile_sets[tile_set][tiles[i][j]];
+					}
+				}
+				output_map += '<br />';
+			}
+			return output_map;
+		}
+		
+		function charConvert(input){
+			return String.fromCharCode(48 + input).replace('<', '#').replace('>', '$');
+		};
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		var interaction_tile_sets = [ null, [
+				'<span style="color:#c0c9cb;">█</span>', //nothing
+				'<span style="color:#34a1fd;">█</span>', //talking
+				'<span style="color:#ed2cfd;">█</span>', //shouting
+				'<span style="color:#fdbe43;">█</span>', //interacting
+				'<span style="color:#c0c9cb;">█</span>', //nothing
+				'<span style="color:#c0c9cb;">█</span>', //nothing
+				'<span style="color:#c0c9cb;">█</span>', //nothing
+				'<span style="color:#c0c9cb;">█</span>', //nothing
+				'<span style="color:#c0c9cb;">█</span>', //nothing
+				'<span style="color:#c0c9cb;">█</span>', //nothing
+				'<span style="color:#fdb1b2;">█</span>', //being interacted with
+				'<span style="color:#fd9db0;">█</span>', //being interacted with
+				'<span style="color:#fd8390;">█</span>', //being interacted with
+				'<span style="color:#fd5c88;">█</span>', //being interacted with
+				'<span style="color:#fd4e69;">█</span>', //being interacted with
+				'<span style="color:#fd2718;">█</span>', //being interacted with
+				'<span style="color:#de2215;">█</span>', //being interacted with
+				'<span style="color:#b31c11;">█</span>', //being interacted with
+				'<span style="color:#95170e;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+				'<span style="color:#76120b;">█</span>', //being interacted with
+			]
+		];
+		
+		var tile_sets = [ null,
+			[
+				'<span style="color:#c0c9cb">▒</span>',
+				'<span style="color:#fff">&nbsp;</span>',
+				'<span style="color:#8fc2ff">≈</span>',
+				'<span style="color:#5393ff">≈</span>',
+				'<span style="color:#cac193">~</span>',
+				'<span style="color:#fff">∧</span>',
+				'<span style="color:#5b6665">∧</span>',
+				'<span style="color:#bdbdc3">∩</span>',
+				'<span style="color:#12641d">┨</span>',
+				'<span style="color:#219462">♧</span>',
+				'<span style="color:#916933">∵</span>', //10
+				'<span style="color:#146445">↑</span>',
+				'<span style="color:#cde6fc">≔</span>',
+				'<span style="color:#11576e">╭</span>', //dark blue grass
+				'<span style="color:#11576e">`</span>', //dark blue grass
+				'<span style="color:#11576e">\'</span>', //dark blue grass
+				'<span style="color:#11576e">,</span>', //dark blue grass
+				'<span style="color:#11576e">&nbsp;</span>', //dark blue grass
+				'<span style="color:#11576e">&nbsp;</span>', //dark blue grass
+				'<span style="color:#11576e">&nbsp;</span>', //dark blue grass
+				'<span style="color:#11576e">&nbsp;</span>', //20  //dark blue grass
+				'<span style="color:#0c5300">╭</span>', //green grass
+				'<span style="color:#0c5300">`</span>', //green grass
+				'<span style="color:#0c5300">\'</span>', //green grass
+				'<span style="color:#0c5300">,</span>', //green grass
+				'<span style="color:#0c5300">&nbsp;</span>', //green grass
+				'<span style="color:#0c5300">&nbsp;</span>', //green grass
+				'<span style="color:#0c5300">&nbsp;</span>', //green grass
+				'<span style="color:#0c5300">&nbsp;</span>', //green grass
+				'<span style="color:#8cac5c">╭</span>', //yellow grass
+				'<span style="color:#8cac5c">`</span>', //30 //yellow grass
+				'<span style="color:#8cac5c">\'</span>', //yellow grass
+				'<span style="color:#8cac5c">,</span>', //yellow grass
+				'<span style="color:#8cac5c">&nbsp;</span>', //yellow grass
+				'<span style="color:#8cac5c">&nbsp;</span>', //yellow grass
+				'<span style="color:#8cac5c">&nbsp;</span>', //yellow grass
+				'<span style="color:#8cac5c">&nbsp;</span>', //yellow grass
+				'<span style="color:#4dac47">&nbsp;</span>',
+				'<span style="color:#4dac47">&nbsp;</span>',
+				'<span style="color:#4dac47">&nbsp;</span>',
+				'<span style="color:#932d40">☿</span>', //40 berry bush?
+				'<span style="color:#936334">⊀</span>', //berry bush without berries
+				'<span style="color:#932d40">∴</span>', //berries
+				'<span style="color:#814423">∗</span>', //log
+				'<span style="color:#a2df7f">∘</span>', //tree seed
+				'<span style="color:#8bdc5f">∫</span>', //sapling
+				'<span style="color:#c67e3c">≏</span>', //wooden wall
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span style="color:#a26024">d</span>', //100 //child dwarf
+				'<span style="color:#a26024">D</span>', //adult dwarf
+				'<span style="color:#2c69bf">d</span>', //talking dwarf child
+				'<span style="color:#2c69bf">D</span>', //talking dwarf adult
+				'<span style="color:green">d</span>', //shouting
+				'<span style="color:green">D</span>', //shouting
+				'<span style="color:yellow">d</span>', //interacting
+				'<span style="color:yellow">D</span>', //interacting
+				'<span style="color:red">d</span>', //being attacked
+				'<span style="color:red">D</span>', //being attacked
+				'<span style="color:gray">d</span>', //corpse
+				'<span style="color:gray">D</span>', //corpse
+				'<span style="color:#a26024">d</span>', //armed?
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span style="color:#33a264">e</span>', //130 //child elf
+				'<span style="color:#33a264">E</span>', //adult eld
+				'<span style="color:#2c69bf">e</span>', //talking
+				'<span style="color:#2c69bf">E</span>', //talking
+				'<span style="color:green">e</span>', //shouting
+				'<span style="color:green">E</span>', //shouting
+				'<span style="color:yellow">e</span>', //interacting
+				'<span style="color:yellow">E</span>', //interacting
+				'<span style="color:red">e</span>', //being attacked
+				'<span style="color:red">E</span>', //being attacked
+				'<span style="color:gray">e</span>', //corpse
+				'<span style="color:gray">E</span>', //corpse
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span style="color:#d2c98a">h</span>', //160 //child human
+				'<span style="color:#d2c98a">H</span>', //adult human
+				'<span style="color:#2c69bf">h</span>', //talking
+				'<span style="color:#2c69bf">H</span>', //talking
+				'<span style="color:green">h</span>', //shouting
+				'<span style="color:green">H</span>', //shouting
+				'<span style="color:yellow">h</span>', //interacting
+				'<span style="color:yellow">H</span>', //interacting
+				'<span style="color:red">h</span>', //being attacked
+				'<span style="color:red">H</span>', //being attacked
+				'<span style="color:gray">h</span>', //corpse
+				'<span style="color:gray">H</span>', //corpse
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span style="color:#379722">g</span>', //190 //child goblin
+				'<span style="color:#379722">G</span>', //adult goblin
+				'<span style="color:#2c69bf">g</span>', //talking
+				'<span style="color:#2c69bf">G</span>', //talking
+				'<span style="color:green">g</span>', //shouting
+				'<span style="color:green">G</span>', //shouting
+				'<span style="color:yellow">g</span>', //interacting
+				'<span style="color:yellow">G</span>', //interacting
+				'<span style="color:red">g</span>', //being attacked
+				'<span style="color:red">G</span>', //being attacked
+				'<span style="color:gray">g</span>', //corpse
+				'<span style="color:gray">G</span>', //corpse
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+				'<span>&nbsp;</span>',
+			]
+		];
+
+	</script>
+
+</html>
